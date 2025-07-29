@@ -6,9 +6,7 @@ from datetime import datetime, timedelta
 import json
 import random
 import numpy as np
-import requests
 from typing import Dict, List, Tuple
-import yfinance as yf
 
 st.set_page_config(
     page_title="Enhanced AI Trading System",
@@ -142,8 +140,161 @@ class EnhancedTradingBot:
         df['Price_Change_20d'] = df['Close'].pct_change(20)
         
         return df
-
-    # Add this anywhere in your enhanced_dashboard.py after the imports
+    
+    def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
+        """Calculate Average True Range"""
+        high_low = df['High'] - df['Low']
+        high_close = np.abs(df['High'] - df['Close'].shift())
+        low_close = np.abs(df['Low'] - df['Close'].shift())
+        
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = np.max(ranges, axis=1)
+        
+        return true_range.rolling(period).mean()
+    
+    def generate_ai_signals_enhanced(self, confidence_mode: str = 'moderate') -> pd.DataFrame:
+        """Generate enhanced AI signals with multiple factors"""
+        
+        signals = []
+        thresholds = self.confidence_settings[confidence_mode]
+        
+        # Select random subset of stocks for live analysis
+        selected_stocks = random.sample(list(self.stock_universe.keys()), min(12, len(self.stock_universe)))
+        
+        for symbol in selected_stocks:
+            # Simulate comprehensive analysis
+            signal_strength = self.analyze_stock_comprehensive(symbol)
+            
+            # Determine action based on signal strength and confidence mode
+            if signal_strength['composite_score'] >= thresholds['buy']:
+                action = 'BUY'
+                confidence = signal_strength['composite_score']
+            elif signal_strength['composite_score'] <= (100 - thresholds['sell']):
+                action = 'SELL' 
+                confidence = 100 - signal_strength['composite_score']
+            else:
+                action = 'HOLD'
+                confidence = max(signal_strength['composite_score'], 100 - signal_strength['composite_score'])
+            
+            # Get sector
+            sector = self.get_stock_sector(symbol)
+            
+            signals.append({
+                'Symbol': symbol,
+                'Sector': sector,
+                'Current Price': f"₹{signal_strength['price']:.2f}",
+                'Change %': f"{signal_strength['change']:+.2f}%",
+                'AI Signal': action,
+                'Confidence': f"{confidence:.1f}%",
+                'Technical Score': f"{signal_strength['technical_score']:.1f}",
+                'Volume Score': f"{signal_strength['volume_score']:.1f}",
+                'Momentum Score': f"{signal_strength['momentum_score']:.1f}",
+                'Action': self.get_action_emoji(action)
+            })
+        
+        return pd.DataFrame(signals)
+    
+    def analyze_stock_comprehensive(self, symbol: str) -> Dict:
+        """Comprehensive stock analysis with multiple factors"""
+        
+        # Generate realistic market data
+        price = random.uniform(500, 4000)
+        change = random.uniform(-5, 5)
+        
+        # Technical Analysis Score (0-100)
+        rsi = random.uniform(20, 80)
+        macd_signal = random.choice(['bullish', 'bearish', 'neutral'])
+        bb_position = random.uniform(0, 1)  # Position within Bollinger Bands
+        
+        technical_score = 50  # Base score
+        
+        # RSI analysis
+        if rsi < 30:
+            technical_score += 25  # Oversold - bullish
+        elif rsi > 70:
+            technical_score -= 25  # Overbought - bearish
+        
+        # MACD analysis
+        if macd_signal == 'bullish':
+            technical_score += 15
+        elif macd_signal == 'bearish':
+            technical_score -= 15
+        
+        # Bollinger Bands analysis
+        if bb_position < 0.2:
+            technical_score += 10  # Near lower band - potential bounce
+        elif bb_position > 0.8:
+            technical_score -= 10  # Near upper band - potential pullback
+        
+        # Volume Analysis Score (0-100)
+        volume_ratio = random.uniform(0.5, 3.0)
+        volume_score = min(100, max(0, 50 + (volume_ratio - 1) * 30))
+        
+        # Momentum Score (0-100)
+        momentum_1d = change
+        momentum_5d = random.uniform(-8, 8)
+        momentum_20d = random.uniform(-15, 15)
+        
+        momentum_score = 50 + (momentum_1d * 2) + (momentum_5d * 1) + (momentum_20d * 0.5)
+        momentum_score = min(100, max(0, momentum_score))
+        
+        # Composite Score (weighted average)
+        composite_score = (
+            technical_score * 0.4 +
+            volume_score * 0.2 +
+            momentum_score * 0.4
+        )
+        
+        return {
+            'price': price,
+            'change': change,
+            'technical_score': technical_score,
+            'volume_score': volume_score,
+            'momentum_score': momentum_score,
+            'composite_score': composite_score
+        }
+    
+    def get_stock_sector(self, symbol: str) -> str:
+        """Get stock sector classification"""
+        sector_mapping = {
+            'TCS': 'IT', 'INFY': 'IT', 'HCLTECH': 'IT', 'WIPRO': 'IT', 'TECHM': 'IT',
+            'HDFCBANK': 'Banking', 'ICICIBANK': 'Banking', 'KOTAKBANK': 'Banking', 
+            'AXISBANK': 'Banking', 'SBIN': 'Banking',
+            'HINDUNILVR': 'FMCG', 'ITC': 'FMCG', 'NESTLEIND': 'FMCG', 
+            'BRITANNIA': 'FMCG', 'DABUR': 'FMCG',
+            'RELIANCE': 'Energy', 'ONGC': 'Energy', 'IOC': 'Energy', 
+            'POWERGRID': 'Utilities', 'NTPC': 'Utilities',
+            'SUNPHARMA': 'Pharma', 'DRREDDY': 'Pharma', 'CIPLA': 'Pharma',
+            'MARUTI': 'Auto', 'TATAMOTORS': 'Auto', 'M&M': 'Auto',
+            'TATASTEEL': 'Metals', 'HINDALCO': 'Metals', 'VEDL': 'Metals'
+        }
+        return sector_mapping.get(symbol, 'Others')
+    
+    def get_action_emoji(self, action: str) -> str:
+        """Get emoji for action"""
+        emoji_map = {'BUY': '🟢 BUY', 'SELL': '🔴 SELL', 'HOLD': '🟡 HOLD'}
+        return emoji_map.get(action, '🟡 HOLD')
+    
+    def track_performance_accuracy(self, signals: pd.DataFrame):
+        """Track signal accuracy over time"""
+        
+        # Simulate accuracy tracking
+        for _, signal in signals.iterrows():
+            accuracy_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'symbol': signal['Symbol'],
+                'signal': signal['AI Signal'],
+                'confidence': float(signal['Confidence'].rstrip('%')),
+                'actual_outcome': random.choice(['correct', 'incorrect']),  # Simulate
+                'sector': signal['Sector']
+            }
+            
+            st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log'].append(accuracy_entry)
+        
+        # Keep only last 1000 entries
+        if len(st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log']) > 1000:
+            st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log'] = \
+                st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log'][-1000:]
 
 def display_performance_analytics():
     """Display comprehensive performance analytics"""
@@ -312,165 +463,6 @@ def display_performance_analytics():
                 })
                 st.dataframe(risk_metrics, use_container_width=True, hide_index=True)
 
-# Add this line where you want the performance analytics to appear in your dashboard
-display_performance_analytics()
-
-    
-    def calculate_atr(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Average True Range"""
-        high_low = df['High'] - df['Low']
-        high_close = np.abs(df['High'] - df['Close'].shift())
-        low_close = np.abs(df['Low'] - df['Close'].shift())
-        
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = np.max(ranges, axis=1)
-        
-        return true_range.rolling(period).mean()
-    
-    def generate_ai_signals_enhanced(self, confidence_mode: str = 'moderate') -> pd.DataFrame:
-        """Generate enhanced AI signals with multiple factors"""
-        
-        signals = []
-        thresholds = self.confidence_settings[confidence_mode]
-        
-        # Select random subset of stocks for live analysis
-        selected_stocks = random.sample(list(self.stock_universe.keys()), min(12, len(self.stock_universe)))
-        
-        for symbol in selected_stocks:
-            # Simulate comprehensive analysis
-            signal_strength = self.analyze_stock_comprehensive(symbol)
-            
-            # Determine action based on signal strength and confidence mode
-            if signal_strength['composite_score'] >= thresholds['buy']:
-                action = 'BUY'
-                confidence = signal_strength['composite_score']
-            elif signal_strength['composite_score'] <= (100 - thresholds['sell']):
-                action = 'SELL' 
-                confidence = 100 - signal_strength['composite_score']
-            else:
-                action = 'HOLD'
-                confidence = max(signal_strength['composite_score'], 100 - signal_strength['composite_score'])
-            
-            # Get sector
-            sector = self.get_stock_sector(symbol)
-            
-            signals.append({
-                'Symbol': symbol,
-                'Sector': sector,
-                'Current Price': f"₹{signal_strength['price']:.2f}",
-                'Change %': f"{signal_strength['change']:+.2f}%",
-                'AI Signal': action,
-                'Confidence': f"{confidence:.1f}%",
-                'Technical Score': f"{signal_strength['technical_score']:.1f}",
-                'Volume Score': f"{signal_strength['volume_score']:.1f}",
-                'Momentum Score': f"{signal_strength['momentum_score']:.1f}",
-                'Action': self.get_action_emoji(action)
-            })
-        
-        return pd.DataFrame(signals)
-    
-    def analyze_stock_comprehensive(self, symbol: str) -> Dict:
-        """Comprehensive stock analysis with multiple factors"""
-        
-        # Generate realistic market data
-        price = random.uniform(500, 4000)
-        change = random.uniform(-5, 5)
-        
-        # Technical Analysis Score (0-100)
-        rsi = random.uniform(20, 80)
-        macd_signal = random.choice(['bullish', 'bearish', 'neutral'])
-        bb_position = random.uniform(0, 1)  # Position within Bollinger Bands
-        
-        technical_score = 50  # Base score
-        
-        # RSI analysis
-        if rsi < 30:
-            technical_score += 25  # Oversold - bullish
-        elif rsi > 70:
-            technical_score -= 25  # Overbought - bearish
-        
-        # MACD analysis
-        if macd_signal == 'bullish':
-            technical_score += 15
-        elif macd_signal == 'bearish':
-            technical_score -= 15
-        
-        # Bollinger Bands analysis
-        if bb_position < 0.2:
-            technical_score += 10  # Near lower band - potential bounce
-        elif bb_position > 0.8:
-            technical_score -= 10  # Near upper band - potential pullback
-        
-        # Volume Analysis Score (0-100)
-        volume_ratio = random.uniform(0.5, 3.0)
-        volume_score = min(100, max(0, 50 + (volume_ratio - 1) * 30))
-        
-        # Momentum Score (0-100)
-        momentum_1d = change
-        momentum_5d = random.uniform(-8, 8)
-        momentum_20d = random.uniform(-15, 15)
-        
-        momentum_score = 50 + (momentum_1d * 2) + (momentum_5d * 1) + (momentum_20d * 0.5)
-        momentum_score = min(100, max(0, momentum_score))
-        
-        # Composite Score (weighted average)
-        composite_score = (
-            technical_score * 0.4 +
-            volume_score * 0.2 +
-            momentum_score * 0.4
-        )
-        
-        return {
-            'price': price,
-            'change': change,
-            'technical_score': technical_score,
-            'volume_score': volume_score,
-            'momentum_score': momentum_score,
-            'composite_score': composite_score
-        }
-    
-    def get_stock_sector(self, symbol: str) -> str:
-        """Get stock sector classification"""
-        sector_mapping = {
-            'TCS': 'IT', 'INFY': 'IT', 'HCLTECH': 'IT', 'WIPRO': 'IT', 'TECHM': 'IT',
-            'HDFCBANK': 'Banking', 'ICICIBANK': 'Banking', 'KOTAKBANK': 'Banking', 
-            'AXISBANK': 'Banking', 'SBIN': 'Banking',
-            'HINDUNILVR': 'FMCG', 'ITC': 'FMCG', 'NESTLEIND': 'FMCG', 
-            'BRITANNIA': 'FMCG', 'DABUR': 'FMCG',
-            'RELIANCE': 'Energy', 'ONGC': 'Energy', 'IOC': 'Energy', 
-            'POWERGRID': 'Utilities', 'NTPC': 'Utilities',
-            'SUNPHARMA': 'Pharma', 'DRREDDY': 'Pharma', 'CIPLA': 'Pharma',
-            'MARUTI': 'Auto', 'TATAMOTORS': 'Auto', 'M&M': 'Auto',
-            'TATASTEEL': 'Metals', 'HINDALCO': 'Metals', 'VEDL': 'Metals'
-        }
-        return sector_mapping.get(symbol, 'Others')
-    
-    def get_action_emoji(self, action: str) -> str:
-        """Get emoji for action"""
-        emoji_map = {'BUY': '🟢 BUY', 'SELL': '🔴 SELL', 'HOLD': '🟡 HOLD'}
-        return emoji_map.get(action, '🟡 HOLD')
-    
-    def track_performance_accuracy(self, signals: pd.DataFrame):
-        """Track signal accuracy over time"""
-        
-        # Simulate accuracy tracking
-        for _, signal in signals.iterrows():
-            accuracy_entry = {
-                'timestamp': datetime.now().isoformat(),
-                'symbol': signal['Symbol'],
-                'signal': signal['AI Signal'],
-                'confidence': float(signal['Confidence'].rstrip('%')),
-                'actual_outcome': random.choice(['correct', 'incorrect']),  # Simulate
-                'sector': signal['Sector']
-            }
-            
-            st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log'].append(accuracy_entry)
-        
-        # Keep only last 1000 entries
-        if len(st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log']) > 1000:
-            st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log'] = \
-                st.session_state.enhanced_portfolio['performance_tracking']['accuracy_log'][-1000:]
-
 # Initialize enhanced bot
 bot = EnhancedTradingBot()
 
@@ -511,7 +503,7 @@ with st.sidebar:
     take_profit = st.slider("Take Profit (%)", 5, 25, 10)
 
 # Main Dashboard
-portfolio_value = bot.init_session_state() or 500000
+portfolio_value = 500000
 
 # Enhanced Metrics Row
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -609,6 +601,9 @@ if not signals_df.empty:
         fig_conf = px.histogram(x=confidence_values, nbins=10, 
                                title="Signal Confidence Distribution")
         st.plotly_chart(fig_conf, use_container_width=True)
+
+# Add performance analytics
+display_performance_analytics()
 
 # Advanced Controls
 st.markdown("## ⚡ Advanced Trading Controls")
