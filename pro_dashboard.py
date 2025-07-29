@@ -5,7 +5,51 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import json
 import os
-from cloud_trader import CloudTradingBot
+
+# Handle imports gracefully for cloud deployment
+try:
+    from cloud_trader import CloudTradingBot
+    CLOUD_TRADER_AVAILABLE = True
+except ImportError:
+    CLOUD_TRADER_AVAILABLE = False
+    st.warning("⚠️ Cloud trader module not available - running in demo mode")
+
+# If cloud trader isn't available, create a mock class
+if not CLOUD_TRADER_AVAILABLE:
+    class MockTradingBot:
+        def __init__(self):
+            self.portfolio = {
+                'cash': 95000,
+                'positions': {
+                    'RELIANCE': {'quantity': 10, 'avg_price': 2800, 'current_price': 2847},
+                    'TCS': {'quantity': 5, 'avg_price': 4100, 'current_price': 4125},
+                },
+                'trade_history': [
+                    {
+                        'timestamp': '2025-01-15T10:30:00',
+                        'symbol': 'RELIANCE',
+                        'action': 'BUY',
+                        'quantity': 10,
+                        'price': 2800,
+                        'confidence': 72
+                    }
+                ],
+                'performance': {
+                    'total_trades': 8,
+                    'winning_trades': 6,
+                    'total_pnl': 1240
+                }
+            }
+        
+        def calculate_total_portfolio_value(self):
+            total = self.portfolio['cash']
+            for pos in self.portfolio['positions'].values():
+                total += pos['quantity'] * pos['current_price']
+            return total
+        
+        def run_trading_session(self):
+            st.success("🎯 Mock trading session completed! (Cloud trader not available)")
+
 
 st.set_page_config(
     page_title="Pro Trading Dashboard",
